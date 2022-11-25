@@ -8,6 +8,7 @@
 // you need to create an adapter
 const utils = require("@iobroker/adapter-core");
 const axios = require("axios").default;
+const iso8601 = require("iso8601-duration");
 
 const { HttpsCookieAgent } = require("http-cookie-agent/http");
 const crypto = require("crypto");
@@ -399,12 +400,24 @@ class Bmw extends utils.Adapter {
               const datal = data.sessions[0];
               datal._date = datal.id.split("_")[0];
               datal._id = datal.id.split("_")[1];
-              datal.timestamp = new Date(datal._date).valueOf();
-              if (datal.energyCharged.replace) {
-                datal.energy = datal.energyCharged.replace("~", "").trim().split(" ")[0];
-                datal.unit = datal.energyCharged.replace("~", "").trim().split(" ")[1];
-              }
               datal.id = "latest";
+              if (datal.energyCharged.replace) {
+                let _d="", _h="", _m="", words=datal.subtitle.toLowerCase().split(" ");
+                for (let i=0; i < words.length; i++) {
+                  if (words[i].includes("h")) {
+                    _h = words[i].replace("h","").trim();
+                  }
+                  if (words[i].includes("min")) {
+                    _m = words[i].replace("min","").trim();
+                  }
+                }
+                _d = "PT" + _h.trim() + "H" + _m.trim() + "M";
+                words = datal.energyCharged.replace("~", "").trim().split(" ");
+                datal.chargingStart = new Date(datal._date).valueOf();
+                datal.chargingDuration = iso8601.toSeconds(iso8601.parse(_d)).toString();
+                datal.chargingEnergy = words[0];
+                datal.chargingUnit = words[1];
+              }
               await this.setObjectNotExistsAsync(vin + element.path + "latest", {
                 type: "channel",
                 common: {
